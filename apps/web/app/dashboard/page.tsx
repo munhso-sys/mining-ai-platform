@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+
+import "katex/dist/katex.min.css";
 export default function Dashboard() {
   const [message, setMessage] = useState("");
   const [reply, setReply] = useState("");
@@ -57,9 +61,12 @@ export default function Dashboard() {
           <div className="border p-4 whitespace-pre-wrap">
             <strong>AI:</strong>
             <div className="mt-2 prose">
-              <ReactMarkdown>
-                {reply}
-              </ReactMarkdown>
+            <ReactMarkdown
+              remarkPlugins={[remarkMath]}
+              rehypePlugins={[rehypeKatex]}
+            >
+              {reply}
+            </ReactMarkdown>
             </div>
           </div>
         )}
