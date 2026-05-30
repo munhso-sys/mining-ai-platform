@@ -1,6 +1,12 @@
 import OpenAI from "openai";
 import { supabase } from "../../../lib/supabase";
-
+type RagSource = {
+  label: string;
+  title: string;
+  fileName: string;
+  similarity: number;
+  content: string;
+};
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -72,7 +78,7 @@ export async function POST(req: Request) {
     match_count: 5,
   });
 
-  const sources =
+  const sources: RagSource[] =
     matches?.map(
       (
         m: {
