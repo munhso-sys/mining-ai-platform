@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import ReactMarkdown from "react-markdown";
 export default function Dashboard() {
   const [message, setMessage] = useState("");
   const [reply, setReply] = useState("");
@@ -56,7 +56,11 @@ export default function Dashboard() {
         {reply && (
           <div className="border p-4 whitespace-pre-wrap">
             <strong>AI:</strong>
-            <div className="mt-2">{reply}</div>
+            <div className="mt-2 prose">
+              <ReactMarkdown>
+                {reply}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
