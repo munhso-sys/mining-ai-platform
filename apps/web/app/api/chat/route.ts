@@ -19,13 +19,31 @@ export async function POST(req: Request) {
     let activeSessionId = sessionId;
 
     if (!activeSessionId) {
-      const { data: session, error } = await supabase
-        .from("chat_sessions")
-        .insert({
-          title: message.slice(0, 40),
-        })
-        .select()
-        .single();
+const titleResponse = await client.responses.create({
+  model: "gpt-5.5",
+  input: [
+    {
+      role: "system",
+      content:
+        "Create a short chat title in Mongolian. Maximum 5 words. No quotes. No punctuation.",
+    },
+    {
+      role: "user",
+      content: message,
+    },
+  ],
+});
+
+const generatedTitle =
+  titleResponse.output_text?.trim() || message.slice(0, 40);
+
+const { data: session, error } = await supabase
+  .from("chat_sessions")
+  .insert({
+    title: generatedTitle,
+  })
+  .select()
+  .single();
 
       if (error) throw error;
 
