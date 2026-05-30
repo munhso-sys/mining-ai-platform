@@ -91,6 +91,7 @@ export default function Dashboard() {
     setLoading(true);
 
     const res = await fetch("/api/chat-stream", {
+      
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -101,6 +102,23 @@ export default function Dashboard() {
       }),
     });
 
+    if (!res.ok) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Алдаа гарлаа. Дахин оролдоно уу.",
+        },
+      ]);
+      setLoading(false);
+      return;
+    }
+
+    const newSessionId = res.headers.get("X-Session-Id");
+
+    if (newSessionId && !currentSessionId) {
+      setCurrentSessionId(newSessionId);
+    }
     const reader = res.body?.getReader();
     const decoder = new TextDecoder();
 

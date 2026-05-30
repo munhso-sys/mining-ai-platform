@@ -1,14 +1,68 @@
 import OpenAI from "openai";
+import { supabase } from "../../../lib/supabase";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 export async function POST(req: Request) {
-  const { message } = await req.json();
+  const { message, sessionId } = await req.json();
+
+  if (!message) {
+    return new Response("Message is required", { status: 400 });
+  }
+
+  let activeSessionId = sessionId;
+
+  if (!activeSessionId) {
+    const titleResponse = await client.responses.create({
+      model: "gpt-5.5",
+      input: [
+        {
+          role: "system",
+          content:
+            "Create a short chat title in Mongolian. Maximum 5 words. No quotes. No punctuation.",
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+    });
+
+    const generatedTitle =
+      titleResponse.output_text?.trim() || message.slice(0, 40);
+
+    const { data: session, error } = await supabase
+      .from("chat_sessions")
+      .insert({
+        title: generatedTitle,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      return new Response(error.message, { status: 500 });
+    }
+
+    activeSessionId = session.id;
+  }
+
+  await supabase.from("chat_messages").insert({
+    session_id: activeSessionId,
+    role: "user",
+    content: message,
+  });
+
+  const { data: history } = await supabase
+    .from("chat_messages")
+    .select("role, content")
+    .eq("session_id", activeSessionId)
+    .order("created_at", { ascending: true });
 
   const stream = await client.responses.create({
     model: "gpt-5.5",
+    stream: true,
     input: [
       {
         role: "system",
@@ -21,31 +75,39 @@ Rules:
 3. All mathematical formulas must use LaTeX.
 4. Inline formulas use $...$
 5. Display formulas use $$...$$.
+6. Never output raw \\sum, \\frac, \\sqrt outside LaTeX delimiters.
+7. When explaining mining economics concepts, include formulas in display mode.
         `,
       },
-      {
-        role: "user",
-        content: message,
-      },
+      ...(history || []).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
     ],
-    stream: true,
   });
 
   const encoder = new TextEncoder();
+  let assistantReply = "";
 
   const readable = new ReadableStream({
     async start(controller) {
       try {
         for await (const event of stream) {
           if (event.type === "response.output_text.delta") {
-            controller.enqueue(
-              encoder.encode(event.delta)
-            );
+            assistantReply += event.delta;
+            controller.enqueue(encoder.encode(event.delta));
           }
         }
 
+        await supabase.from("chat_messages").insert({
+          session_id: activeSessionId,
+          role: "assistant",
+          content: assistantReply,
+        });
+
         controller.close();
       } catch (error) {
+        console.error(error);
         controller.error(error);
       }
     },
@@ -54,6 +116,7 @@ Rules:
   return new Response(readable, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
+      "X-Session-Id": activeSessionId,
     },
   });
 }
