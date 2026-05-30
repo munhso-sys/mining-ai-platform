@@ -60,6 +60,26 @@ export async function POST(req: Request) {
     .eq("session_id", activeSessionId)
     .order("created_at", { ascending: true });
 
+  const embeddingResponse = await client.embeddings.create({
+    model: "text-embedding-3-small",
+    input: message,
+  });
+
+  const queryEmbedding = embeddingResponse.data[0].embedding;
+
+  const { data: matches } = await supabase.rpc("match_document_chunks", {
+    query_embedding: queryEmbedding,
+    match_count: 5,
+  });
+
+  const context =
+    matches
+      ?.map(
+        (m: { content: string; similarity: number }, index: number) =>
+          `Source ${index + 1} | Similarity: ${m.similarity}\n${m.content}`
+      )
+      .join("\n\n---\n\n") || "";
+
   const stream = await client.responses.create({
     model: "gpt-5.5",
     stream: true,
@@ -77,6 +97,12 @@ Rules:
 5. Display formulas use $$...$$.
 6. Never output raw \\sum, \\frac, \\sqrt outside LaTeX delimiters.
 7. When explaining mining economics concepts, include formulas in display mode.
+8. If document context is provided, answer primarily from that context.
+9. If the context does not contain the answer, say that the uploaded documents do not contain enough information.
+
+Document context:
+
+${context}
         `,
       },
       ...(history || []).map((m) => ({
