@@ -19,14 +19,21 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
-
+type DocumentItem = {
+  id: string;
+  title: string;
+  file_name: string;
+  file_path: string;
+  mime_type: string;
+  created_at: string;
+};
 export default function Dashboard() {
   const [message, setMessage] = useState("");
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollToBottom = () => {
@@ -35,6 +42,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     scrollToBottom();
+    loadSessions();
+    loadDocuments();
   }, [messages, loading]);
 
   const loadSessions = async () => {
@@ -45,7 +54,37 @@ export default function Dashboard() {
 
     setSessions(data || []);
   };
+const loadDocuments = async () => {
+  const res = await fetch("/api/documents");
+  const data = await res.json();
 
+  setDocuments(data.documents || []);
+};
+
+const deleteDocument = async (doc: DocumentItem) => {
+  const ok = confirm(`Delete document: ${doc.file_name}?`);
+  if (!ok) return;
+
+  const res = await fetch("/api/documents", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: doc.id,
+      filePath: doc.file_path,
+    }),
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    alert(data.error);
+    return;
+  }
+
+  await loadDocuments();
+};
   const loadMessages = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
 
@@ -105,6 +144,7 @@ export default function Dashboard() {
       alert(
         `Uploaded successfully.\nChunks: ${data.chunks}`
       );
+      await loadDocuments();
     }
 
     setUploading(false);
@@ -235,6 +275,36 @@ export default function Dashboard() {
               </button>
             </div>
           ))}
+        </div>
+        <div className="mt-6 border-t pt-4">
+          <h2 className="text-xl font-bold">Documents</h2>
+
+          <div className="mt-3 flex flex-col gap-2">
+            {documents.length === 0 && (
+              <p className="text-sm text-slate-500">
+                No documents uploaded.
+              </p>
+            )}
+
+            {documents.map((doc) => (
+              <div
+                key={doc.id}
+                className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
+              >
+                <span className="flex-1 truncate">
+                  📄 {doc.file_name}
+                </span>
+
+                <button
+                  className="text-red-500 hover:text-red-700"
+                  onClick={() => deleteDocument(doc)}
+                  title="Delete document"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </aside>
 

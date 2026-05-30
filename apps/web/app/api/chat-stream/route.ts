@@ -72,13 +72,38 @@ export async function POST(req: Request) {
     match_count: 5,
   });
 
+  const sources =
+    matches?.map(
+      (
+        m: {
+          content: string;
+          similarity: number;
+          document_title: string;
+          file_name: string;
+        },
+        index: number
+      ) => ({
+        label: `Source ${index + 1}`,
+        title: m.document_title || m.file_name,
+        fileName: m.file_name,
+        similarity: m.similarity,
+        content: m.content,
+      })
+    ) || [];
+
   const context =
-    matches
-      ?.map(
-        (m: { content: string; similarity: number }, index: number) =>
-          `Source ${index + 1} | Similarity: ${m.similarity}\n${m.content}`
+    sources
+      .map(
+        (s) => `
+  ${s.label}
+  Document: ${s.title}
+  File: ${s.fileName}
+  Similarity: ${s.similarity}
+
+  ${s.content}
+  `
       )
-      .join("\n\n---\n\n") || "";
+      .join("\n\n---\n\n");
 
   const stream = await client.responses.create({
     model: "gpt-5.5",
@@ -99,7 +124,14 @@ Rules:
 7. When explaining mining economics concepts, include formulas in display mode.
 8. If document context is provided, answer primarily from that context.
 9. If the context does not contain the answer, say that the uploaded documents do not contain enough information.
+10. When using document context, cite the source documents.
+11. At the end of the answer include:
 
+Эх сурвалж:
+- Document Name 1
+- Document Name 2
+
+12. Never invent sources that are not present in the provided context.
 Document context:
 
 ${context}
