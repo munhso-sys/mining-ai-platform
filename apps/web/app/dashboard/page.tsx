@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const scrollToBottom = () => {
@@ -41,10 +42,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    scrollToBottom();
     loadSessions();
     loadDocuments();
-  }, [messages, loading]);
+  }, []);
 
   const loadSessions = async () => {
     const { data } = await supabase
@@ -82,8 +82,18 @@ const deleteDocument = async (doc: DocumentItem) => {
     alert(data.error);
     return;
   }
-
+  setSelectedDocumentIds((prev) =>
+    prev.filter((id) => id !== doc.id)
+  );
   await loadDocuments();
+};
+
+const toggleDocumentSelection = (documentId: string) => {
+  setSelectedDocumentIds((prev) =>
+    prev.includes(documentId)
+      ? prev.filter((id) => id !== documentId)
+      : [...prev, documentId]
+  );
 };
   const loadMessages = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
@@ -174,6 +184,7 @@ const deleteDocument = async (doc: DocumentItem) => {
       body: JSON.stringify({
         message: userMessage,
         sessionId: currentSessionId,
+        documentIds: selectedDocumentIds,
       }),
     });
 
@@ -279,6 +290,12 @@ const deleteDocument = async (doc: DocumentItem) => {
         <div className="mt-6 border-t pt-4">
           <h2 className="text-xl font-bold">Documents</h2>
 
+          <p className="mt-1 text-xs text-slate-500">
+            {selectedDocumentIds.length === 0
+              ? "All documents will be searched"
+              : `${selectedDocumentIds.length} document(s) selected`}
+          </p>
+
           <div className="mt-3 flex flex-col gap-2">
             {documents.length === 0 && (
               <p className="text-sm text-slate-500">
@@ -291,6 +308,11 @@ const deleteDocument = async (doc: DocumentItem) => {
                 key={doc.id}
                 className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm"
               >
+                <input
+                  type="checkbox"
+                  checked={selectedDocumentIds.includes(doc.id)}
+                  onChange={() => toggleDocumentSelection(doc.id)}
+                />
                 <span className="flex-1 truncate">
                   📄 {doc.file_name}
                 </span>

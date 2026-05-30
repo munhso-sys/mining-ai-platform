@@ -12,7 +12,7 @@ const client = new OpenAI({
 });
 
 export async function POST(req: Request) {
-  const { message, sessionId } = await req.json();
+  const { message, sessionId, documentIds } = await req.json();
 
   if (!message) {
     return new Response("Message is required", { status: 400 });
@@ -73,9 +73,15 @@ export async function POST(req: Request) {
 
   const queryEmbedding = embeddingResponse.data[0].embedding;
 
+  const selectedDocumentIds =
+    Array.isArray(documentIds) && documentIds.length > 0
+      ? documentIds
+      : null;
+
   const { data: matches } = await supabase.rpc("match_document_chunks", {
     query_embedding: queryEmbedding,
     match_count: 5,
+    filter_document_ids: selectedDocumentIds,
   });
 
   const sources: RagSource[] =
