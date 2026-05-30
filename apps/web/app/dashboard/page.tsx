@@ -93,7 +93,7 @@ export default function Dashboard() {
     setMessage("");
     setLoading(true);
 
-    const res = await fetch("/api/chat", {
+    const res = await fetch("/api/chat-stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -104,20 +104,38 @@ export default function Dashboard() {
       }),
     });
 
-    const data = await res.json();
+    const reader = res.body?.getReader();
+    const decoder = new TextDecoder();
 
-    if (data.sessionId && !currentSessionId) {
-      setCurrentSessionId(data.sessionId);
-      await loadSessions();
-    }
+    let assistantReply = "";
 
     setMessages((prev) => [
       ...prev,
       {
         role: "assistant",
-        content: data.reply || data.error || "No response",
+        content: "",
       },
     ]);
+
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        assistantReply += chunk;
+
+        setMessages((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = {
+            role: "assistant",
+            content: assistantReply,
+          };
+          return next;
+        });
+      }
+    }
 
     setLoading(false);
   };
